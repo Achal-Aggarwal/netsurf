@@ -2969,6 +2969,7 @@ bool layout_line(struct box *first, int *width, int *y,
 
 	/* handle vertical-align by adjusting box y values */
 	/** \todo  proper vertical alignment handling */
+	/* Using LaTeX subscript and superscript position % for sub & sup */
 	for (d = first; d != b; d = d->next) {
 		if ((d->type == BOX_INLINE && d->inline_end) ||
 				d->type == BOX_BR ||
@@ -2979,11 +2980,15 @@ bool layout_line(struct box *first, int *width, int *y,
 			switch (css_computed_vertical_align(d->style, &value,
 					&unit)) {
 			case CSS_VERTICAL_ALIGN_SUPER:
+				d->y -= 1.14 * (used_height - d->height);
+				break;
 			case CSS_VERTICAL_ALIGN_TOP:
 			case CSS_VERTICAL_ALIGN_TEXT_TOP:
 				/* already at top */
 				break;
 			case CSS_VERTICAL_ALIGN_SUB:
+				d->y += 1.25 * (used_height - d->height);
+				break;
 			case CSS_VERTICAL_ALIGN_BOTTOM:
 			case CSS_VERTICAL_ALIGN_TEXT_BOTTOM:
 				d->y += used_height - d->height;
