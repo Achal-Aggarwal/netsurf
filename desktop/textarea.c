@@ -885,7 +885,7 @@ static bool textarea_reflow_singleline(struct textarea *ta, size_t b_off,
 	shift = ta->border_width + ta->pad_left - ta->scroll_x;
 
 	r->x0 = max(r->x0, retained_width + shift - 1);
-	r->x1 = min(r->x1, max(x, ta->lines[0].width) + shift + 1);
+	r->x1 = max(r->x1, max(x, ta->lines[0].width) + shift + 1);
 
 	ta->lines[0].b_start = 0;
 	ta->lines[0].b_length = ta->show->len - 1;
@@ -906,7 +906,7 @@ static bool textarea_reflow_singleline(struct textarea *ta, size_t b_off,
  * Reflow a multiline textarea from the given line onwards
  *
  * \param ta		Textarea to reflow
- * \param b_start	0-based byte offset in ta->text to start of modification
+ * \param b_start	0-based byte offset in ta->show's text to start of modification
  * \param b_length	Byte length of change in textarea text
  * \return true on success false otherwise
  */
@@ -971,12 +971,12 @@ static bool textarea_reflow_multiline(struct textarea *ta,
 
 		/* Set up initial length and text offset */
 		if (line == 0) {
-			len = ta->text.len - 1;
-			text = ta->text.data;
+			len = ta->show->len - 1;
+			text = ta->show->data;
 		} else {
 			unsigned int i;
-			len = ta->text.len - 1 - ta->lines[line].b_start;
-			text = ta->text.data + ta->lines[line].b_start;
+			len = ta->show->len - 1 - ta->lines[line].b_start;
+			text = ta->show->data + ta->lines[line].b_start;
 
 			for (i = 0; i < line; i++) {
 				if (ta->lines[i].width > h_extent) {
@@ -985,9 +985,9 @@ static bool textarea_reflow_multiline(struct textarea *ta,
 			}
 		}
 
-		if (ta->text.len == 1) {
+		if (ta->show->len == 1) {
 			/* Handle empty textarea */
-			assert(ta->text.data[0] == '\0');
+			assert(ta->show->data[0] == '\0');
 			ta->lines[line].b_start = 0;
 			ta->lines[line].b_length = 0;
 			ta->lines[line++].width = 0;
@@ -1049,7 +1049,7 @@ static bool textarea_reflow_multiline(struct textarea *ta,
 			if (para_end == text + b_off && *para_end == '\n') {
 				/* Not found any spaces to wrap at, and we
 				 * have a newline char */
-				ta->lines[line].b_start = text - ta->text.data;
+				ta->lines[line].b_start = text - ta->show->data;
 				ta->lines[line].b_length = para_end - text;
 				ta->lines[line++].width = x;
 
@@ -1060,7 +1060,7 @@ static bool textarea_reflow_multiline(struct textarea *ta,
 					/* reached end of input;
 					 * add last line */
 					ta->lines[line].b_start = text +
-							b_off - ta->text.data;
+							b_off - ta->show->data;
 					ta->lines[line].b_length = 0;
 					ta->lines[line++].width = x;
 				}
@@ -1082,7 +1082,7 @@ static bool textarea_reflow_multiline(struct textarea *ta,
 					b_off = space + 1 - text;
 			}
 
-			ta->lines[line].b_start = text - ta->text.data;
+			ta->lines[line].b_start = text - ta->show->data;
 			ta->lines[line].b_length = b_off;
 			ta->lines[line++].width = x;
 
@@ -1166,7 +1166,7 @@ static bool textarea_reflow_multiline(struct textarea *ta,
 			b_start + b_length) {
 		size_t b_line_end = ta->lines[start].b_start +
 				ta->lines[start].b_length;
-		text = ta->text.data + b_line_end;
+		text = ta->show->data + b_line_end;
 		if (*text == '\0' || *text == '\n') {
 			r->y1 = min(r->y1, (signed)
 					(ta->line_height * (start + 1) +
@@ -1178,7 +1178,7 @@ static bool textarea_reflow_multiline(struct textarea *ta,
 				int retained_width = 0;
 				size_t retain_end = b_start -
 						ta->lines[start].b_start;
-				text = ta->text.data + ta->lines[start].b_start;
+				text = ta->show->data + ta->lines[start].b_start;
 
 				nsfont.font_width(&ta->fstyle, text,
 						retain_end, &retained_width);
@@ -1980,14 +1980,14 @@ bool textarea_set_placeholder(struct textarea *ta, const char *text)
 	ta->placeholder.utf8_len = utf8_length(ta->text.data);
 
 	//textarea_normalise_text(ta, 0, len);
-/*
+
 	if (ta->flags & TEXTAREA_MULTILINE) {
 		 if (!textarea_reflow_multiline(ta, 0, len - 1, &r))
 		 	return false;
 	} else {
 		 if (!textarea_reflow_singleline(ta, 0, &r))
 		 	return false;
-	}*/
+	}
 
 	return true;
 }
@@ -2061,34 +2061,6 @@ bool textarea_drop_text(struct textarea *ta, const char *text,
 
 	caret_pos += byte_delta;
 	textarea_set_caret_internal(ta, caret_pos);
-
-	msg.ta = ta;
-	msg.type = TEXTAREA_MSG_REDRAW_REQUEST;
-	msg.data.redraw.x0 = 0;
-	msg.data.redraw.y0 = 0;
-	msg.data.redraw.x1 = ta->vis_width;
-	msg.data.redraw.y1 = ta->vis_height;
-
-	ta->callback(ta->data, &msg);
-
-	return true;
-}
-
-/* exported interface, documented in textarea.h */
-bool textarea_drop_placeholder(struct textarea *ta)
-{
-	struct textarea_msg msg;
-	struct rect r;	/**< Redraw rectangle */
-	int byte_delta;
-
-	if (ta->flags & TEXTAREA_READONLY)
-		return false;
-
-	if (!textarea_replace_text(ta, 0, 0, ta->placeholder.data, 
-		ta->placeholder.len, false, &byte_delta, &r)) {
-			return false;
-
-	}
 
 	msg.ta = ta;
 	msg.type = TEXTAREA_MSG_REDRAW_REQUEST;
@@ -2929,14 +2901,15 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 		/* if text length is zero, we just show placeholder instead.*/
 		if (ta->text.utf8_len == 0){
 			ta->show = &ta->placeholder;
-			ta->flags |=TEXTAREA_PLACEHOLDER_ACTIVE;
-			msg.data.redraw.x0 = ta->border_width;
-			msg.data.redraw.y0 = ta->border_width;
-			msg.data.redraw.x1 = ta->vis_width - ta->border_width;
-			msg.data.redraw.y1 = ta->vis_height - ta->border_width;
-		} else {
-			msg.data.redraw = r;
+			ta->flags |= TEXTAREA_PLACEHOLDER_ACTIVE;
+
+			if (ta->flags & TEXTAREA_MULTILINE)
+				 textarea_reflow_multiline(ta, 0, 0, &r);
+			else
+				 textarea_reflow_singleline(ta, 0, &r);
 		}
+
+		msg.data.redraw = r;
 
 		ta->callback(ta->data, &msg);
 	}
