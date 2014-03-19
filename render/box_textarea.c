@@ -219,13 +219,16 @@ bool box_textarea_create_textarea(html_content *html,
 		struct box *box, struct dom_node *node)
 {
 	dom_string *dom_text = NULL;
+	dom_string *placeholder_text = NULL;
 	dom_exception err;
 	textarea_setup ta_setup;
 	textarea_flags ta_flags;
 	plot_font_style_t fstyle;
+	plot_font_style_t placeholder_style;
 	bool read_only = false;
 	struct form_control *gadget = box->gadget;
 	const char *text;
+	const char *placeholder;
 
 	assert(gadget != NULL);
 	assert(gadget->type == GADGET_TEXTAREA ||
@@ -274,12 +277,32 @@ bool box_textarea_create_textarea(html_content *html,
 		text = "";
 	}
 
+	/* Set placeholder flag as field has no intial value */
+	if (strcmp(text,"") == 0){
+		ta_flags |= TEXTAREA_PLACEHOLDER_ACTIVE;
+	}
+
+	/* Get placeholder text */
+	err = dom_html_input_element_get_placeholder((dom_html_input_element *) node,
+		 &placeholder_text);
+	if (err != DOM_NO_ERR)
+		return false;
+
+	if (placeholder_text != NULL) {
+		placeholder = dom_string_data(placeholder_text);
+	} else {
+		/* No initial placeholder, or failed reading it;
+		 * use a blank string */
+		placeholder = "";
+	}
+
 	if (read_only)
 		ta_flags |= TEXTAREA_READONLY;
 
 	gadget->data.text.data.gadget = gadget;
 
 	font_plot_style_from_css(gadget->box->style, &fstyle);
+	font_plot_style_from_css(gadget->box->style, &placeholder_style);
 
 	/* Reset to correct values by layout */
 	ta_setup.width = 200;
@@ -293,6 +316,7 @@ bool box_textarea_create_textarea(html_content *html,
 	ta_setup.border_width = 0;
 	ta_setup.border_col = 0x000000;
 	ta_setup.text = fstyle;
+	ta_setup.ph_text = placeholder_style; 
 	ta_setup.text.background = NS_TRANSPARENT;
 	/* Make selected text either black or white, as gives greatest contrast
 	 * with background colour. */
@@ -310,6 +334,9 @@ bool box_textarea_create_textarea(html_content *html,
 	}
 
 	if (!textarea_set_text(gadget->data.text.ta, text))
+		return false;
+
+	if (!textarea_set_placeholder(gadget->data.text.ta, placeholder))
 		return false;
 
 	return true;

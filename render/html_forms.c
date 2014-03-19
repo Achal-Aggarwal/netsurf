@@ -351,6 +351,31 @@ parse_input_element(struct form *forms, dom_html_input_element *input)
 		}
 	}
 
+	if (control->type == GADGET_TEXTBOX) {
+		dom_string *ds_placeholder = NULL;
+
+		if (dom_html_input_element_get_placeholder(
+			    input, &ds_placeholder) == DOM_NO_ERR && ds_placeholder != NULL) {
+			control->placeholder = strndup(
+				dom_string_data(ds_placeholder),
+				dom_string_byte_length(ds_placeholder));
+			if (control->placeholder == NULL) {
+				form_free_control(control);
+				control = NULL;
+				goto out;
+			}
+			control->plength = strlen(control->placeholder);
+		} else {
+			control->value = strdup("");
+			control->plength = 0;
+			if (control->value == NULL) {
+				form_free_control(control);
+				control = NULL;
+				goto out;
+			}
+		}
+	}
+
 	if (control->type != GADGET_FILE && control->type != GADGET_IMAGE) {
 		if (dom_html_input_element_get_value(
 			    input, &ds_value) == DOM_NO_ERR) {

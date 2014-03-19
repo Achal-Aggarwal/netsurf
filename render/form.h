@@ -92,11 +92,13 @@ struct form_control {
 	char *name;			/**< Control name */
 	char *value;			/**< Current value of control */
 	char *initial_value;		/**< Initial value of control */
+	char *placeholder;
 	bool disabled;			/**< Whether control is disabled */
 
 	struct box *box;		/**< Box for control */
 
 	unsigned int length;		/**< Number of characters in control */
+	unsigned int plength;		/**< Number of characters in placeholder */
 	unsigned int maxlength;		/**< Maximum characters permitted */
 
 	bool selected;			/**< Whether control is selected */

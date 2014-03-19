@@ -106,6 +106,8 @@ struct textarea {
 	int text_y_offset_baseline;	/**< Vertical dist to 1st baseline */
 
 	plot_font_style_t fstyle;	/**< Text style, inc. textarea bg col */
+	plot_font_style_t ph_fstyle;	/**< placeholder text style,
+									inc. textarea bg col */
 	plot_font_style_t sel_fstyle;	/**< Selected text style */
 	int line_height;		/**< Line height obtained from style */
 
@@ -113,6 +115,7 @@ struct textarea {
 #define PASSWORD_REPLACEMENT "\xe2\x80\xa2"
 #define PASSWORD_REPLACEMENT_W (sizeof(PASSWORD_REPLACEMENT) - 1)
 	struct textarea_utf8 password;	/**< Text for obscured display */
+	struct textarea_utf8 placeholder;	/**< Text area placeholder */
 
 	struct textarea_utf8 *show;	/**< Points at .text or .password */
 
@@ -1835,6 +1838,8 @@ struct textarea *textarea_create(const textarea_flags flags,
 
 	ret->fstyle = setup->text;
 
+	ret->ph_fstyle = setup->ph_text;
+
 	ret->sel_fstyle = setup->text;
 	ret->sel_fstyle.foreground = setup->selected_text;
 	ret->sel_fstyle.background = setup->selected_bg;
@@ -1870,6 +1875,17 @@ struct textarea *textarea_create(const textarea_flags flags,
 	ret->text.len = 1;
 	ret->text.utf8_len = 0;
 
+	ret->placeholder.data = malloc(TA_ALLOC_STEP);
+	if (ret->placeholder.data == NULL) {
+		LOG(("malloc failed"));
+		free(ret);
+		return NULL;
+	}
+	ret->placeholder.data[0] = '\0';
+	ret->placeholder.alloc = TA_ALLOC_STEP;
+	ret->placeholder.len = 1;
+	ret->placeholder.utf8_len = 0;
+
 	if (flags & TEXTAREA_PASSWORD) {
 		ret->password.data = malloc(TA_ALLOC_STEP);
 		if (ret->password.data == NULL) {
@@ -1892,6 +1908,10 @@ struct textarea *textarea_create(const textarea_flags flags,
 		ret->password.utf8_len = 0;
 
 		ret->show = &ret->text;
+	}
+
+	if (flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
+		ret->show = &ret->placeholder;
 	}
 
 	ret->line_height = FIXTOINT(FDIV((FMUL(FLTTOFIX(1.3),
@@ -1938,6 +1958,39 @@ void textarea_destroy(struct textarea *ta)
 	free(ta);
 }
 
+
+/* exported interface, documented in textarea.h */
+bool textarea_set_placeholder(struct textarea *ta, const char *text)
+{
+	unsigned int len = strlen(text) + 1;
+	struct rect r = {0, 0, 0, 0};
+
+	if (len >= ta->placeholder.alloc) {
+		char *temp = realloc(ta->placeholder.data, len + TA_ALLOC_STEP);
+		if (temp == NULL) {
+			LOG(("realloc failed"));
+			return false;
+		}
+		ta->placeholder.data = temp;
+		ta->placeholder.alloc = len + TA_ALLOC_STEP;
+	}
+
+	memcpy(ta->placeholder.data, text, len);
+	ta->placeholder.len = len;
+	ta->placeholder.utf8_len = utf8_length(ta->text.data);
+
+	//textarea_normalise_text(ta, 0, len);
+/*
+	if (ta->flags & TEXTAREA_MULTILINE) {
+		 if (!textarea_reflow_multiline(ta, 0, len - 1, &r))
+		 	return false;
+	} else {
+		 if (!textarea_reflow_singleline(ta, 0, &r))
+		 	return false;
+	}*/
+
+	return true;
+}
 
 /* exported interface, documented in textarea.h */
 bool textarea_set_text(struct textarea *ta, const char *text)
@@ -2008,6 +2061,34 @@ bool textarea_drop_text(struct textarea *ta, const char *text,
 
 	caret_pos += byte_delta;
 	textarea_set_caret_internal(ta, caret_pos);
+
+	msg.ta = ta;
+	msg.type = TEXTAREA_MSG_REDRAW_REQUEST;
+	msg.data.redraw.x0 = 0;
+	msg.data.redraw.y0 = 0;
+	msg.data.redraw.x1 = ta->vis_width;
+	msg.data.redraw.y1 = ta->vis_height;
+
+	ta->callback(ta->data, &msg);
+
+	return true;
+}
+
+/* exported interface, documented in textarea.h */
+bool textarea_drop_placeholder(struct textarea *ta)
+{
+	struct textarea_msg msg;
+	struct rect r;	/**< Redraw rectangle */
+	int byte_delta;
+
+	if (ta->flags & TEXTAREA_READONLY)
+		return false;
+
+	if (!textarea_replace_text(ta, 0, 0, ta->placeholder.data, 
+		ta->placeholder.len, false, &byte_delta, &r)) {
+			return false;
+
+	}
 
 	msg.ta = ta;
 	msg.type = TEXTAREA_MSG_REDRAW_REQUEST;
@@ -2400,7 +2481,13 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 	line = ta->caret_pos.line;
 	readonly = (ta->flags & TEXTAREA_READONLY ? true : false);
 
+	if (key && ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE){
+		ta->show = ta->flags & TEXTAREA_PASSWORD ? &ta->password : &ta->text;
+		ta->flags &=~TEXTAREA_PLACEHOLDER_ACTIVE;
+	}
+
 	if (!(key <= 0x001F || (0x007F <= key && key <= 0x009F))) {
+
 		/* normal character insertion */
 		length = utf8_from_ucs4(key, utf8);
 		utf8[length] = '\0';
@@ -2817,6 +2904,14 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 
 	redraw &= ~textarea_set_caret_internal(ta, caret);
 
+	/* If after any operation redraw is required and text length is zero,
+		we just show placeholder instead.  */
+	/*if (redraw && ta->text.utf8_len == 0){
+		ta->show = &ta->placeholder;
+		ta->flags |=TEXTAREA_PLACEHOLDER_ACTIVE;
+		textarea_drop_placeholder(ta);
+	}*/
+
 	/* TODO: redraw only the bit that changed */
 	msg.ta = ta;
 	msg.type = TEXTAREA_MSG_REDRAW_REQUEST;
@@ -2831,7 +2926,18 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 		ta->callback(ta->data, &msg);
 
 	} else if (redraw) {
-		msg.data.redraw = r;
+		/* if text length is zero, we just show placeholder instead.*/
+		if (ta->text.utf8_len == 0){
+			ta->show = &ta->placeholder;
+			ta->flags |=TEXTAREA_PLACEHOLDER_ACTIVE;
+			msg.data.redraw.x0 = ta->border_width;
+			msg.data.redraw.y0 = ta->border_width;
+			msg.data.redraw.x1 = ta->vis_width - ta->border_width;
+			msg.data.redraw.y1 = ta->vis_height - ta->border_width;
+		} else {
+			msg.data.redraw = r;
+		}
+
 		ta->callback(ta->data, &msg);
 	}
 
