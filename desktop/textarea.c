@@ -2282,6 +2282,11 @@ void textarea_redraw(struct textarea *ta, int x, int y, colour bg, float scale,
 			fstyle = ta->fstyle;
 			fstyle.size = fsize;
 
+			/* if paceholder is active dim its foreground  */
+			if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
+				fstyle.foreground = 0xff999999;
+			}
+
 			plot->text(x + ta->border_width + ta->pad_left -
 					ta->scroll_x,
 					y + line_y + text_y_offset_baseline,
@@ -3015,6 +3020,11 @@ textarea_mouse_status textarea_mouse_action(struct textarea *ta,
 	}
 
 	status |= TEXTAREA_MOUSE_EDITOR;
+
+	/* If placeholder is active, don't perfrom any mouse function.*/
+	if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
+		x = y = 0;
+	}
 
 	/* Mouse action is textarea's responsibility */
 	if (mouse & BROWSER_MOUSE_DOUBLE_CLICK) {
