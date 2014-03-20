@@ -2999,6 +2999,11 @@ textarea_mouse_status textarea_mouse_action(struct textarea *ta,
 	struct textarea_msg msg;
 	textarea_mouse_status status = TEXTAREA_MOUSE_NONE;
 
+	/* If placeholder is active, don't perform any mouse function.*/
+	if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
+		x = y = 0;
+	}
+
 	if (ta->drag_info.type != TEXTAREA_DRAG_NONE &&
 			mouse == BROWSER_MOUSE_HOVER) {
 		/* There is a drag that we must end */
@@ -3020,11 +3025,6 @@ textarea_mouse_status textarea_mouse_action(struct textarea *ta,
 	}
 
 	status |= TEXTAREA_MOUSE_EDITOR;
-
-	/* If placeholder is active, don't perfrom any mouse function.*/
-	if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
-		x = y = 0;
-	}
 
 	/* Mouse action is textarea's responsibility */
 	if (mouse & BROWSER_MOUSE_DOUBLE_CLICK) {
@@ -3123,8 +3123,15 @@ textarea_mouse_status textarea_mouse_action(struct textarea *ta,
 	}
 
 	if (ta->sel_start != -1) {
-		/* Have selection */
-		status |= TEXTAREA_MOUSE_SELECTION;
+
+		/* If placeholder is active, don't select placeholder text.*/
+		if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
+			/* Clear selection */
+			textarea_clear_selection(ta);
+		} else {
+			/* Have selection */
+			status |= TEXTAREA_MOUSE_SELECTION;
+		}
 	}
 
 	return status;
