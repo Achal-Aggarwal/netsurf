@@ -1215,6 +1215,11 @@ static size_t textarea_get_b_off_xy(struct textarea *ta, int x, int y,
 		return 0;
 	}
 
+	/* if placeholder is active, that means no data */
+	if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
+		return 0;
+	}
+
 	x = x - ta->border_width - ta->pad_left +
 			(visible ? ta->scroll_x : 0);
 	y = y - ta->border_width - ta->pad_top +
@@ -2284,7 +2289,8 @@ void textarea_redraw(struct textarea *ta, int x, int y, colour bg, float scale,
 
 			/* if paceholder is active dim its foreground  */
 			if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
-				fstyle.foreground = 0xff999999;
+				fstyle.foreground = mix_colour(fstyle.background,
+					colour_to_bw_furthest(fstyle.background), (int)(255 * 0.25));
 			}
 
 			plot->text(x + ta->border_width + ta->pad_left -
@@ -2998,11 +3004,6 @@ textarea_mouse_status textarea_mouse_action(struct textarea *ta,
 	unsigned int b_off;
 	struct textarea_msg msg;
 	textarea_mouse_status status = TEXTAREA_MOUSE_NONE;
-
-	/* If placeholder is active, don't perform any mouse function.*/
-	if (ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE) {
-		x = y = 0;
-	}
 
 	if (ta->drag_info.type != TEXTAREA_DRAG_NONE &&
 			mouse == BROWSER_MOUSE_HOVER) {
