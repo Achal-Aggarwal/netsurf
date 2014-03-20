@@ -1786,7 +1786,9 @@ static void textarea_setup_text_offsets(struct textarea *ta)
 		/* Single line text area; text is vertically centered */
 		int vis_height = ta->vis_height - 2 * ta->border_width;
 		text_y_offset += (vis_height - ta->line_height + 1) / 2;
-		text_y_offset_baseline += (vis_height * 3 + 2) / 4;
+		if (text_y_offset < 0)
+			text_y_offset = 0;
+		text_y_offset_baseline += text_y_offset + (ta->line_height * 3 + 2) / 4;
 	}
 
 	ta->text_y_offset = text_y_offset;
@@ -1894,9 +1896,8 @@ struct textarea *textarea_create(const textarea_flags flags,
 		ret->show = &ret->text;
 	}
 
-	ret->line_height = FIXTOINT(FDIV((FMUL(FLTTOFIX(1.3),
-			FMUL(nscss_screen_dpi, INTTOFIX((setup->text.size))))),
-			FONT_SIZE_SCALE * F_72));
+	ret->line_height = FIXTOINT(FDIV(FMUL(nscss_screen_dpi,
+		INTTOFIX((setup->text.size)/FONT_SIZE_SCALE)),F_72)) * 1.3 ;
 
 	ret->caret_pos.line = ret->caret_pos.byte_off = -1;
 	ret->caret_x = 0;

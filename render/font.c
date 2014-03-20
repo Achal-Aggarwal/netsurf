@@ -45,8 +45,7 @@ void font_plot_style_from_css(const css_computed_style *css,
 			css_computed_font_family(css, &families));
 
 	css_computed_font_size(css, &length, &unit);
-	fstyle->size = FIXTOINT(FMUL(nscss_len2pt(length, unit), 
-				      INTTOFIX(FONT_SIZE_SCALE)));
+	fstyle->size = FIXTOINT(nscss_len2pt(length, unit)) * FONT_SIZE_SCALE;
 
 	/* Clamp font size to configured minimum */
 	if (fstyle->size < (nsoption_int(font_min_size) * FONT_SIZE_SCALE) / 10)
