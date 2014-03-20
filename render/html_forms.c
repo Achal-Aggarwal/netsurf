@@ -351,7 +351,8 @@ parse_input_element(struct form *forms, dom_html_input_element *input)
 		}
 	}
 
-	if (control->type == GADGET_TEXTBOX) {
+	if (control->type == GADGET_TEXTBOX ||
+			control->type == GADGET_PASSWORD) {
 		dom_string *ds_placeholder = NULL;
 
 		if (dom_html_input_element_get_placeholder(
@@ -366,9 +367,9 @@ parse_input_element(struct form *forms, dom_html_input_element *input)
 			}
 			control->plength = strlen(control->placeholder);
 		} else {
-			control->value = strdup("");
+			control->placeholder = strdup("");
 			control->plength = 0;
-			if (control->value == NULL) {
+			if (control->placeholder == NULL) {
 				form_free_control(control);
 				control = NULL;
 				goto out;

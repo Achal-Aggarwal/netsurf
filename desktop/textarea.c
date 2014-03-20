@@ -106,8 +106,6 @@ struct textarea {
 	int text_y_offset_baseline;	/**< Vertical dist to 1st baseline */
 
 	plot_font_style_t fstyle;	/**< Text style, inc. textarea bg col */
-	plot_font_style_t ph_fstyle;	/**< placeholder text style,
-									inc. textarea bg col */
 	plot_font_style_t sel_fstyle;	/**< Selected text style */
 	int line_height;		/**< Line height obtained from style */
 
@@ -1843,8 +1841,6 @@ struct textarea *textarea_create(const textarea_flags flags,
 
 	ret->fstyle = setup->text;
 
-	ret->ph_fstyle = setup->ph_text;
-
 	ret->sel_fstyle = setup->text;
 	ret->sel_fstyle.foreground = setup->selected_text;
 	ret->sel_fstyle.background = setup->selected_bg;
@@ -1988,10 +1984,10 @@ bool textarea_set_placeholder(struct textarea *ta, const char *text)
 
 	if (ta->flags & TEXTAREA_MULTILINE) {
 		 if (!textarea_reflow_multiline(ta, 0, len - 1, &r))
-		 	return false;
+			return false;
 	} else {
 		 if (!textarea_reflow_singleline(ta, 0, &r))
-		 	return false;
+			return false;
 	}
 
 	return true;
@@ -2464,6 +2460,7 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 	line = ta->caret_pos.line;
 	readonly = (ta->flags & TEXTAREA_READONLY ? true : false);
 
+	/* Remove active placeholder and serve input key. */
 	if (key && ta->flags & TEXTAREA_PLACEHOLDER_ACTIVE){
 		ta->show = ta->flags & TEXTAREA_PASSWORD ? &ta->password : &ta->text;
 		ta->flags &=~TEXTAREA_PLACEHOLDER_ACTIVE;
@@ -2886,14 +2883,6 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 	}
 
 	redraw &= ~textarea_set_caret_internal(ta, caret);
-
-	/* If after any operation redraw is required and text length is zero,
-		we just show placeholder instead.  */
-	/*if (redraw && ta->text.utf8_len == 0){
-		ta->show = &ta->placeholder;
-		ta->flags |=TEXTAREA_PLACEHOLDER_ACTIVE;
-		textarea_drop_placeholder(ta);
-	}*/
 
 	/* TODO: redraw only the bit that changed */
 	msg.ta = ta;

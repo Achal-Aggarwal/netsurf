@@ -224,7 +224,6 @@ bool box_textarea_create_textarea(html_content *html,
 	textarea_setup ta_setup;
 	textarea_flags ta_flags;
 	plot_font_style_t fstyle;
-	plot_font_style_t placeholder_style;
 	bool read_only = false;
 	struct form_control *gadget = box->gadget;
 	const char *text;
@@ -302,7 +301,6 @@ bool box_textarea_create_textarea(html_content *html,
 	gadget->data.text.data.gadget = gadget;
 
 	font_plot_style_from_css(gadget->box->style, &fstyle);
-	font_plot_style_from_css(gadget->box->style, &placeholder_style);
 
 	/* Reset to correct values by layout */
 	ta_setup.width = 200;
@@ -316,7 +314,6 @@ bool box_textarea_create_textarea(html_content *html,
 	ta_setup.border_width = 0;
 	ta_setup.border_col = 0x000000;
 	ta_setup.text = fstyle;
-	ta_setup.ph_text = placeholder_style; 
 	ta_setup.text.background = NS_TRANSPARENT;
 	/* Make selected text either black or white, as gives greatest contrast
 	 * with background colour. */

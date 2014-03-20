@@ -39,7 +39,7 @@ typedef enum {
 	TEXTAREA_READONLY		= (1 << 2),	/**< Non-editable */
 	TEXTAREA_INTERNAL_CARET		= (1 << 3),	/**< Render own caret */
 	TEXTAREA_PASSWORD		= (1 << 4),	/**< Obscured display */
-	TEXTAREA_PLACEHOLDER_ACTIVE		= (1 << 5)	/**< Is placeholder active */
+	TEXTAREA_PLACEHOLDER_ACTIVE	= (1 << 5)	/**< Is placeholder active */
 } textarea_flags;
 
 typedef enum {
@@ -101,7 +101,6 @@ typedef struct textarea_setup {
 	colour selected_text;	/**< Textarea selected text colour */
 	colour selected_bg;	/**< Textarea selection background colour */
 	plot_font_style_t text;	/**< Textarea background colour and font */
-	plot_font_style_t ph_text;	/**< Textarea placeholder background colour and font */
 
 } textarea_setup;
 
@@ -159,15 +158,6 @@ bool textarea_set_placeholder(struct textarea *ta, const char *text);
  */
 bool textarea_drop_text(struct textarea *ta, const char *text,
 		size_t text_length);
-
-/**
- * Insert the text in a text area at the caret, replacing any selection.
- *
- * \param ta Text area
- * \param text UTF-8 text to set text area's contents to
- * \return true on success, false on memory exhaustion or if ta lacks caret
- */
-bool textarea_drop_placeholder(struct textarea *ta);
 
 /**
  * Extract the text from a text area
