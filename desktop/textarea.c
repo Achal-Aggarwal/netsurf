@@ -1980,6 +1980,7 @@ bool textarea_set_placeholder(struct textarea *ta, const char *text)
 	ta->placeholder.len = len;
 	ta->placeholder.utf8_len = utf8_length(ta->text.data);
 
+	// \todo normalise placeholder text if it contains line breaks
 	//textarea_normalise_text(ta, 0, len);
 
 	if (ta->flags & TEXTAREA_MULTILINE) {
@@ -2884,6 +2885,19 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 
 	redraw &= ~textarea_set_caret_internal(ta, caret);
 
+	/* if text length is zero, we just show placeholder instead.*/
+	if (!readonly) {
+		if (ta->text.utf8_len == 0){
+			ta->show = &ta->placeholder;
+			ta->flags |= TEXTAREA_PLACEHOLDER_ACTIVE;
+
+			if (ta->flags & TEXTAREA_MULTILINE)
+				 textarea_reflow_multiline(ta, 0, 0, &r);
+			else
+				 textarea_reflow_singleline(ta, 0, &r);
+		}
+	}
+
 	/* TODO: redraw only the bit that changed */
 	msg.ta = ta;
 	msg.type = TEXTAREA_MSG_REDRAW_REQUEST;
@@ -2898,16 +2912,6 @@ bool textarea_keypress(struct textarea *ta, uint32_t key)
 		ta->callback(ta->data, &msg);
 
 	} else if (redraw) {
-		/* if text length is zero, we just show placeholder instead.*/
-		if (ta->text.utf8_len == 0){
-			ta->show = &ta->placeholder;
-			ta->flags |= TEXTAREA_PLACEHOLDER_ACTIVE;
-
-			if (ta->flags & TEXTAREA_MULTILINE)
-				 textarea_reflow_multiline(ta, 0, 0, &r);
-			else
-				 textarea_reflow_singleline(ta, 0, &r);
-		}
 
 		msg.data.redraw = r;
 
